@@ -81,6 +81,10 @@ module HTTP::Session
       buffer_exactly(count)
       return drain_buffer(count)
     end
+
+    def buffered_size
+      @buffer.size
+    end
   end
 
   class OutputStream < Stream
