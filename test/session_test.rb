@@ -34,6 +34,8 @@ end
 assert 'copies domain, etc but does not copy URI path into requests' do
   uri = 'http://user:pass@localhost:8123/path?query'
   session = HTTP::Session.new uri
+  session.stream = HTTP::Session::Stream.new { nil }
+  session.connection = HTTP::Session::OutputStream.new
   %w( get post put patch delete head ).each do |verb|
     begin
       session.send(verb, '/path') do |req|
@@ -45,8 +47,8 @@ assert 'copies domain, etc but does not copy URI path into requests' do
         assert_equal '/path', req.path
         assert_nil req.query_string
       end
-    rescue Errno::ECONNREFUSED
-      # expected behavior, no server is running
+    rescue EOFError
+      # expected behavior
     end
   end
 end
