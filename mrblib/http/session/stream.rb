@@ -22,6 +22,11 @@ module HTTP::Session
       @buffer.size == 0 && @underlying_eof
     end
 
+    # forces the underlying input stream to be treated as end-of-file.
+    def eof!
+      @underlying_eof = true
+    end
+
     # Puts the given string into the front of the internal buffer, to be
     # returned by the next call to #read.
     def unread(str)
@@ -42,7 +47,7 @@ module HTTP::Session
         # @buffer << d.to_s
         @buffer += d.to_s
       else
-        @underlying_eof = true
+        eof!
       end
     end
 

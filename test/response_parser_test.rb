@@ -12,6 +12,7 @@ end_rsp
   assert_equal 'HTTP/1.1', response.protocol
   assert_equal 'OK', response.status_text
   assert_equal '{}', response.body.read(response['content-length'].to_i)
+  assert_true response.body.eof?
   assert_equal 'application/json', response['content-type']
   assert_equal "extra data that shouldn't be parsed due to content-length",
                stream.read
@@ -32,6 +33,7 @@ end_rsp
   assert_equal 'OK', response.status_text
   assert_equal '2', response['content-length']
   assert_equal '{}', response.body.read
+  assert_true response.body.eof?
   assert_equal 'application/json', response['content-type']
   assert_equal "extra data that shouldn't be parsed due to content-length",
                stream.read
@@ -106,9 +108,11 @@ end_rsp
   chars = data.each_char # enumerator
   stream = HTTP::Session::Stream.new { chars.next rescue nil }
   response1 = HTTP::Session::Response::Parser.new(stream).response
-  body1 = response1.body.read
+  body1 = 15.times.map { response1.body.read(1) }.join
+  assert_true response1.body.eof?
   response2 = HTTP::Session::Response::Parser.new(stream).response
-  body2 = response2.body.read
+  body2 = 15.times.map { response2.body.read(1) }.join
+  assert_true response2.body.eof?
   assert_equal 'HTTP/1.1', response1.protocol
   assert_equal 'OK', response1.status_text
   assert_equal "chunk 1 chunk 2", body1
@@ -137,6 +141,6 @@ end_rsp
   assert_equal 200, response.status
   assert_equal 'HTTP/1.1', response.protocol
   assert_equal 'OK', response.status_text
-  assert_equal '{}', response.body.read
   assert_equal 'application/json', response['content-type']
+  assert_equal '{}', response.body.read
 end

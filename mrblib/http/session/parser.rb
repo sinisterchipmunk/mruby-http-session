@@ -75,16 +75,28 @@ module HTTP::Session
           @stream.unread rest
           chunk_size_hex.to_i(16)
         end
+        decoded = ''
         transmission.body = Stream.new do |count|
-          chunk_size = read_chunk_size.call
-          payload = ''
-          payload << @stream.read(chunk_size - payload.size) until payload.size >= chunk_size || @stream.eof?
-          # put back any extra bytes
-          @stream.unread payload[chunk_size, payload.size]
-          boundary = @stream.read_exactly(2)
-          raise EncodingError, "chunk boundary not found" unless @stream.eof? || boundary == "\r\n"
-          if chunk_size > 0 then payload[0, chunk_size]
-          else nil
+          if count >= decoded.size
+            # not enough data decoded; must read at least another chunk
+            chunk_size = read_chunk_size.call
+            payload = ''
+            payload << @stream.read(chunk_size - payload.size) until payload.size >= chunk_size || @stream.eof?
+            # put back any extra bytes
+            decoded << payload[0, chunk_size]
+            @stream.unread payload[chunk_size, payload.size]
+            boundary = @stream.read_exactly(2)
+            raise EncodingError, "chunk boundary not found" unless @stream.eof? || boundary == "\r\n"
+            if chunk_size == 0 then
+              # zero chunk, end of body
+              transmission.body.eof!
+            end
+          end
+          if decoded.size > 0
+            decoded[0, count].tap { decoded = decoded[count, decoded.size] || '' }
+          else
+            # no more data has been decoded
+            nil
           end
         end
       elsif transmission['content-length']
@@ -96,6 +108,8 @@ module HTTP::Session
             count = bytes_remaining if count > bytes_remaining
             d = @stream.read(count)
             bytes_remaining = d ? bytes_remaining - d.size : 0
+            # if content-length bytes were read, end of body
+            transmission.body.eof! if bytes_remaining == 0
             d
           end
         end
