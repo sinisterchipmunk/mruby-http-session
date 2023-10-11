@@ -45,9 +45,8 @@ module HTTP::Session
     end
 
     protected def parse
-      if !@have_path_line then receive_path_line
-      elsif !ready? then receive_headers
-      end
+      receive_path_line if !@have_path_line
+      receive_headers   if @have_path_line && !ready?
     end
 
     def request

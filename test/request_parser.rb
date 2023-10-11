@@ -145,3 +145,25 @@ end_rsp
   assert_equal '{}', request.body.read
   assert_equal 'application/json', request['content-type']
 end
+
+assert 'polling-based parser parses everything in 1 call if the data is available' do
+  data = <<-end_rsp.lines.map(&:chomp).join("\r\n")
+GET /path HTTP/1.1
+Content-type: application/json
+Content-length: 2
+
+{}
+end_rsp
+  chars = data.each_char # enumerator
+  stream = HTTP::Session::Stream.new(data) { nil }
+  parser = HTTP::Session::Request::Parser.new(stream)
+  assert_false parser.ready?, 'request has not been parsed, should not be ready'
+  parser.parse
+  assert_true parser.ready?, 'all data was available, should be ready'
+  request = parser.request
+  assert_equal :get, request.verb
+  assert_equal '/path', request.path
+  assert_equal 'HTTP/1.1', request.protocol
+  assert_equal '{}', request.body.read
+  assert_equal 'application/json', request['content-type']
+end

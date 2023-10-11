@@ -44,10 +44,9 @@ module HTTP::Session
     end
 
     protected def parse
-      if !@have_status_line then receive_status_line
-      elsif !ready? then receive_headers
-      else receive_body
-      end
+      receive_status_line if !@have_status_line
+      receive_headers     if @have_status_line && !ready?
+      receive_body        if ready?
     end
 
     def response

@@ -50,17 +50,18 @@ module HTTP::Session
     # Attempts to parse a single header. Returns true when the last header
     # has been received.
     protected def receive_headers
-      return nil unless line = gets
-      if line.size.to_i > 0
-        header_name, delim, header_value = *line.partition(':')
-        transmission[header_name] = header_value.strip
-        return false
-      else
-        # Blank line, end of headers.
-        @ready = true
-        receive_body # misnomer, doesn't read anything, just inits the object
-        return true
+      while line = gets
+        if line.size.to_i > 0
+          header_name, delim, header_value = *line.partition(':')
+          transmission[header_name] = header_value.strip
+        else
+          # Blank line, end of headers.
+          @ready = true
+          receive_body # misnomer, doesn't read anything, just inits the object
+          return true
+        end
       end
+      return false
     end
 
     protected def receive_body
