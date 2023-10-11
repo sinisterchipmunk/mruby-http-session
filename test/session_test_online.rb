@@ -166,4 +166,22 @@ if ENV['TEST_ONLINE']
     rsp = session.get '/missing_want_404'
     assert_equal 404, rsp.status, 'expected 404 Not Found from server'
   end
+
+  assert 'HTTP::Session using polling-based parsing' do
+    session = HTTP::Session.new('https://www.example.com')
+    session.ssl_options[:ca_chain] = CA_CHAIN_EXAMPLE_COM
+
+    parser = session.get '/', parse: false
+    iterations = 0
+    iterations += 1 and parser.parse until parser.ready?
+    assert_true iterations > 1, 'number of iterations to parse may vary but should be more than 1'
+    assert_equal 200, parser.response.status, 'expected 200 OK from server'
+    assert_match "*</html>", parser.response.body.read.chomp
+
+    parser = session.get '/missing_want_404', parse: false
+    iterations = 0
+    iterations += 1 and parser.parse until parser.ready?
+    assert_true iterations > 1, 'number of iterations to parse may vary but should be more than 1'
+    assert_equal 404, parser.response.status, 'expected 404 Not Found from server'
+  end
 end

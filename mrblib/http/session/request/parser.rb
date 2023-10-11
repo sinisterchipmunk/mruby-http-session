@@ -39,20 +39,28 @@ module HTTP::Session
   # body.
   #
   class Request::Parser < HTTP::Session::Parser
-    alias request transmission
-
     def initialize(stream)
       super
       @transmission = Request.new
-      receive_path_line
-      receive_headers
-      receive_body
+    end
+
+    protected def parse
+      if !@have_path_line then receive_path_line
+      elsif !ready? then receive_headers
+      end
+    end
+
+    def request
+      parse until ready?
+      @transmission
     end
 
     private def receive_path_line
-      line = gets
+      return if @have_path_line
+      return unless line = gets
       transmission.verb, space, rest = *line.partition(' ')
       transmission.path, space, transmission.protocol = *rest.rpartition(' ')
+      @have_path_line = true
     end
   end
 end

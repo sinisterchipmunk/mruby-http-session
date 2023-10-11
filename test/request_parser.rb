@@ -124,3 +124,24 @@ end_rsp
   assert_equal 'application/json', request2['content-type']
   assert_equal 'unparsed data following zero chunk', stream.read
 end
+
+assert 'polling-based parser' do
+  data = <<-end_rsp.lines.map(&:chomp).join("\r\n")
+GET /path HTTP/1.1
+Content-type: application/json
+Content-length: 2
+
+{}
+end_rsp
+  chars = data.each_char # enumerator
+  stream = HTTP::Session::Stream.new { chars.next rescue nil }
+  parser = HTTP::Session::Request::Parser.new(stream)
+  assert_false parser.ready?, 'request has not been parsed, should not be ready'
+  parser.parse until parser.ready?
+  request = parser.request
+  assert_equal :get, request.verb
+  assert_equal '/path', request.path
+  assert_equal 'HTTP/1.1', request.protocol
+  assert_equal '{}', request.body.read
+  assert_equal 'application/json', request['content-type']
+end

@@ -139,23 +139,37 @@ module HTTP::Session
       !open?
     end
 
-    # Dispatches the specified request object. If a block is given, the
-    # request object is yielded to the block before being sent to the server.
-    # Returns the server's response. This method may block, invoking
-    # #wait_for_data! if it does.
-    def request(req, &block)
+    # Dispatches the specified request object and returns a parser for the
+    # response. You can then poll the parser object's #parse method until
+    # it is #ready?. This way, you can control the main loop without relying
+    # on #when_blocking.
+    def dispatch_request(req, &block)
       # prefer keep-alive, but client can change this in the block.
       req['connection'] = 'keep-alive'
       yield req if block_given?
       # we must consume the most recent response body before we can make a new
       # request, or the response body will be interpreted as headers for the
       # one we are about to dispatch.
-      @current_response&.body&.read
+      @current_response&.response&.body&.read
       establish_connection unless open?
       msg = req.to_s
       @log&.call :send, msg
       @connection.write msg
-      Response::Parser.new(@stream).response
+      Response::Parser.new(@stream)
+    end
+
+    # Dispatches the specified request object. If a block is given, the
+    # request object is yielded to the block before being sent to the server.
+    # Returns the server's response. This method may block, invoking
+    # #wait_for_data! if it does.
+    #
+    # If `parse` is `true`, this method will not return until a response is
+    # parsed, and an HTTP::Session::Response object is returned. Otherwise,
+    # this method will return as soon as possible, and an
+    # HTTP::Session::Response::Parser object will be returned.
+    def request(req, parse: true, &block)
+      @current_response = dispatch_request(req, &block)
+      parse ? @current_response.response : @current_response
     end
 
     # Receive up to `count` bytes from the underlying input stream. Should
@@ -191,41 +205,71 @@ module HTTP::Session
 
     # Performs a GET request. If a block is given, the request object is
     # yielded to the block before being sent to the server.
-    def get(path, &block)
-      request(Request::Get.new(request_uri(path)), &block)
+    #
+    # If `parse` is `true`, this method will not return until a response is
+    # parsed, and an HTTP::Session::Response object is returned. Otherwise,
+    # this method will return as soon as possible, and an
+    # HTTP::Session::Response::Parser object will be returned.
+    def get(path, parse: true, &block)
+      request(Request::Get.new(request_uri(path)), parse: parse, &block)
     end
 
     # Performs a HEAD request. If a block is given, the request object is
     # yielded to the block before being sent to the server.
-    def head(path, &block)
-      request(Request::Head.new(request_uri(path)), &block)
+    #
+    # If `parse` is `true`, this method will not return until a response is
+    # parsed, and an HTTP::Session::Response object is returned. Otherwise,
+    # this method will return as soon as possible, and an
+    # HTTP::Session::Response::Parser object will be returned.
+    def head(path, parse: true, &block)
+      request(Request::Head.new(request_uri(path)), parse: parse, &block)
     end
 
     # Performs a POST request. If a block is given, the request object is
     # yielded to the block before being sent to the server. Body must be a
     # string. Passing an IO as a body is TODO.
-    def post(path, body = nil, &block)
-      request(Request::Post.new(request_uri(path), body), &block)
+    #
+    # If `parse` is `true`, this method will not return until a response is
+    # parsed, and an HTTP::Session::Response object is returned. Otherwise,
+    # this method will return as soon as possible, and an
+    # HTTP::Session::Response::Parser object will be returned.
+    def post(path, body = nil, parse: true, &block)
+      request(Request::Post.new(request_uri(path), body), parse: parse, &block)
     end
 
     # Performs a PATCH request. If a block is given, the request object is
     # yielded to the block before being sent to the server. Body must be a
     # string. Passing an IO as a body is TODO.
-    def patch(path, body = nil, &block)
-      request(Request::Patch.new(request_uri(path), body), &block)
+    #
+    # If `parse` is `true`, this method will not return until a response is
+    # parsed, and an HTTP::Session::Response object is returned. Otherwise,
+    # this method will return as soon as possible, and an
+    # HTTP::Session::Response::Parser object will be returned.
+    def patch(path, body = nil, parse: true, &block)
+      request(Request::Patch.new(request_uri(path), body), parse: parse, &block)
     end
 
     # Performs a PUT request. If a block is given, the request object is
     # yielded to the block before being sent to the server. Body must be a
     # string. Passing an IO as a body is TODO.
-    def put(path, body = nil, &block)
-      request(Request::Put.new(request_uri(path), body), &block)
+    #
+    # If `parse` is `true`, this method will not return until a response is
+    # parsed, and an HTTP::Session::Response object is returned. Otherwise,
+    # this method will return as soon as possible, and an
+    # HTTP::Session::Response::Parser object will be returned.
+    def put(path, body = nil, parse: true, &block)
+      request(Request::Put.new(request_uri(path), body), parse: parse, &block)
     end
 
     # Performs a DELETE request. If a block is given, the request object is
     # yielded to the block before being sent to the server.
-    def delete(path, &block)
-      request(Request::Delete.new(request_uri(path)), &block)
+    #
+    # If `parse` is `true`, this method will not return until a response is
+    # parsed, and an HTTP::Session::Response object is returned. Otherwise,
+    # this method will return as soon as possible, and an
+    # HTTP::Session::Response::Parser object will be returned.
+    def delete(path, parse: true, &block)
+      request(Request::Delete.new(request_uri(path)), parse: parse, &block)
     end
   end
 end

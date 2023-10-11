@@ -38,20 +38,29 @@
 #
 module HTTP::Session
   class Response::Parser < HTTP::Session::Parser
-    alias response transmission
-
     def initialize(stream)
       super
       @transmission = Response.new
-      receive_status_line
-      receive_headers
-      receive_body
+    end
+
+    protected def parse
+      if !@have_status_line then receive_status_line
+      elsif !ready? then receive_headers
+      else receive_body
+      end
+    end
+
+    def response
+      parse until ready?
+      @transmission
     end
 
     private def receive_status_line
-      line = gets
+      return if @have_status_line
+      return unless line = gets
       transmission.protocol, space, rest = *line.partition(' ')
       transmission.status_code, space, transmission.status_text = *rest.partition(' ')
+      @have_status_line = true
     end
   end
 end

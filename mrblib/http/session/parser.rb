@@ -11,31 +11,61 @@ module HTTP::Session
 
     def initialize(stream)
       @stream = stream
+      @ready = false
     end
 
+    def ready?
+      @ready
+    end
+
+    # protected def gets
+    #   data = ''
+    #   until offset = data.index("\r\n")
+    #     packet = @stream.read(1024)
+    #     raise EOFError unless packet
+    #     data << packet
+    #   end
+    #   line = data[0, offset]
+    #   @stream.unread data[offset + 2, data.size] # remaining data is part of headers
+    #   return line
+    # end
+
+    # Returns a line of data (up to CR+LF), or else returns `nil` if a line
+    # is not available.
     protected def gets
-      data = ''
-      until offset = data.index("\r\n")
-        packet = @stream.read(1024)
-        raise EOFError unless packet
-        data << packet
+      @tmpbuf ||= ''
+      packet = @stream.read(1024)
+      raise EOFError unless packet
+      @tmpbuf << packet
+      if offset = @tmpbuf.index("\r\n")
+        line = @tmpbuf[0, offset]
+        @stream.unread @tmpbuf[offset + 2, @tmpbuf.size]
+        @tmpbuf = ''
+        return line
+      else
+        return nil
       end
-      line = data[0, offset]
-      @stream.unread data[offset + 2, data.size] # remaining data is part of headers
-      return line
     end
 
+    # Attempts to parse a single header. Returns true when the last header
+    # has been received.
     protected def receive_headers
-      loop do
-        line = gets
-        # we have a header
-        break unless line&.size.to_i > 0 # break on empty line, end of headers
+      return nil unless line = gets
+      if line.size.to_i > 0
         header_name, delim, header_value = *line.partition(':')
         transmission[header_name] = header_value.strip
+        return false
+      else
+        # Blank line, end of headers.
+        @ready = true
+        receive_body # misnomer, doesn't read anything, just inits the object
+        return true
       end
     end
 
     protected def receive_body
+      return transmission.body if @have_body
+      @have_body = true
       # choose an appropriate body stream based on transfer encoding
       if transmission['transfer-encoding'] == 'chunked'
         read_chunk_size = Proc.new do
